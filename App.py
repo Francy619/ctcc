@@ -8,12 +8,15 @@ import pandas as pd
 import streamlit.components.v1 as components
 
 # --- IMPORTS FOR 3D RENDERING ---
+# --- IMPORTS FOR 3D RENDERING ---
 try:
     import py3Dmol
     from stmol import showmol
     HAS_3D = True
-except ImportError:
+    CRASH_REASON = ""
+except Exception as e:
     HAS_3D = False
+    CRASH_REASON = str(e)
 
 HARTREE_TO_KCAL = Decimal('627.509')
 
@@ -1029,9 +1032,13 @@ elif st.session_state.app_mode == "Structural Analysis":
             if m1_file:
                 if HAS_3D:
                     st.markdown("**👁️ Monomer 1 Structure & Atoms**")
+                    # --- 3D MOLECULE VIEWER M1 ---
+            if m1_file:
+                if HAS_3D:
+                    st.markdown("**👁️ Monomer 1 Structure & Atoms**")
                     show_3d_molecule(m1_file.getvalue().decode('utf-8'))
                 else:
-                    st.error("🚨 Missing Required Packages! To see the 3D molecule viewer, you must add `stmol` and `py3Dmol` to your `requirements.txt` file (if on Streamlit Cloud) or run `pip install stmol py3Dmol` on your computer.")
+                    st.error(f"🚨 3D Viewer Failed to Load. Exact Python Error: {CRASH_REASON}")
             
             m1_bonds = st.number_input("Number of target bonds in Monomer 1:", min_value=0, max_value=5, value=2)
             m1_bond_data = []
