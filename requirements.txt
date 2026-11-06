@@ -1,0 +1,5 @@
+streamlit
+xlsxwriter
+pandas
+stmol
+py3Dmol
