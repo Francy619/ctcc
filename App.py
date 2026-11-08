@@ -75,7 +75,8 @@ if st.session_state.app_mode == "Home":
         st.write("")
         if st.button("📈 CVB Index", use_container_width=True, type="secondary"): st.session_state.app_mode = "CVB Index"; st.rerun()
             
-    st.markdown("""<div class="footer-text"><strong>Developed by:</strong> Francis Thomas & Dr. Renjith Thomas <br> Automated tools for parsing outputs.</div>""", unsafe_allow_html=True)
+    st.markdown("""<div class="footer-text"><strong>Developed by:</strong> Francis Thomas & Dr. Renjith Thomas <br> <strong> Research Group:</strong> Centre for Theoretical and Computational Chemistry (CTCC)
+Institutions: St. Dominic's College, Kanjirapally & St. Berchmans College, Changanassery <br> Automated tools for parsing outputs.</div>""", unsafe_allow_html=True)
 
 # Call the correct module based on the state
 elif st.session_state.app_mode == "Interaction Energy": interaction.render()
