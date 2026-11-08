@@ -61,7 +61,7 @@ def render():
             col_cvb_inputs, col_cvb_view = st.columns([1, 1])
             with col_cvb_inputs:
                 w_file = st.file_uploader(f"Upload .wfn or .wfx File {i+1}", type=["wfn", "wfx"], key=f"cvb_wfn_{i}")
-                w_atoms = st.text_input("Target Atoms (e.g., 1,3,4)", key=f"cvb_atoms_{i}")
+                w_atoms = st.text_input("Input index of donor atom, hydrogen and acceptor atom in the H-bond (D-H...A) (e.g., 1,3,4)", key=f"cvb_atoms_{i}")
                 
             with col_cvb_view:
                 if w_file:
