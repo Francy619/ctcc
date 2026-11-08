@@ -9,11 +9,11 @@ import shutil
 import py3Dmol
 from stmol import showmol
 
-def get_pdb_from_multiwfn(w_file_bytes, filename):
-    """Uses Multiwfn silently to export a .pdb coordinate file (no graphics required)"""
-    tmp_dir = f"temp_cvb_pdb_{filename.replace('.', '_')}"
+def get_xyz_from_multiwfn(w_file_bytes, filename):
+    """Uses Multiwfn silently to export an .xyz coordinate file for perfect 3D rendering"""
+    tmp_dir = f"temp_cvb_xyz_{filename.replace('.', '_')}"
     os.makedirs(tmp_dir, exist_ok=True)
-    pdb_data = None
+    xyz_data = None
     
     try:
         if os.path.exists("Multiwfn"):
@@ -23,21 +23,21 @@ def get_pdb_from_multiwfn(w_file_bytes, filename):
         with open(file_path, "wb") as f:
             f.write(w_file_bytes)
             
-        # Command: 100 (Other functions) -> 2 (Export geometry) -> 1 (Export to PDB) -> filename -> 0 -> q
-        cmd = "100\n2\n1\npreview.pdb\n0\nq\n"
+        # Command: 100 (Other functions) -> 2 (Export geometry) -> 2 (Export to XYZ) -> preview.xyz -> 0 -> q
+        cmd = "100\n2\n2\npreview.xyz\n0\nq\n"
         subprocess.run(["./Multiwfn", filename], input=cmd, capture_output=True, text=True, cwd=tmp_dir)
         
-        pdb_path = os.path.join(tmp_dir, "preview.pdb")
-        if os.path.exists(pdb_path):
-            with open(pdb_path, "r") as f:
-                pdb_data = f.read()
+        xyz_path = os.path.join(tmp_dir, "preview.xyz")
+        if os.path.exists(xyz_path):
+            with open(xyz_path, "r") as f:
+                xyz_data = f.read()
                 
     except Exception as e:
         pass
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
         
-    return pdb_data
+    return xyz_data
 
 def render():
     st.markdown('<div class="home-btn-container">', unsafe_allow_html=True)
@@ -67,38 +67,39 @@ def render():
                 if w_file:
                     st.markdown("**👁️ Interactive Molecule Viewer (Atom Indices)**")
                     
-                    preview_key = f"cvb_pdb_{w_file.name}_{w_file.size}"
+                    preview_key = f"cvb_xyz_{w_file.name}_{w_file.size}"
                     
                     if preview_key not in st.session_state:
                         with st.spinner("Extracting 3D Coordinates..."):
-                            st.session_state[preview_key] = get_pdb_from_multiwfn(w_file.getvalue(), w_file.name)
+                            st.session_state[preview_key] = get_xyz_from_multiwfn(w_file.getvalue(), w_file.name)
                             
-                    pdb_data = st.session_state[preview_key]
+                    xyz_data = st.session_state[preview_key]
                     
-                    if pdb_data:
+                    if xyz_data:
                         # Render the 3D molecule interactively
                         view = py3Dmol.view(width=400, height=350)
-                        view.addModel(pdb_data, "pdb")
+                        view.addModel(xyz_data, "xyz")
                         view.setStyle({'stick': {'radius': 0.15}, 'sphere': {'scale': 0.25}})
                         
-                        # Manually stamp the Atom Name + Index on every atom exactly where it belongs
-                        for line in pdb_data.split('\n'):
-                            if line.startswith("ATOM") or line.startswith("HETATM"):
-                                try:
-                                    atom_index = int(line[6:11].strip())
-                                    atom_name = line[12:16].strip()
-                                    x = float(line[30:38].strip())
-                                    y = float(line[38:46].strip())
-                                    z = float(line[46:54].strip())
-                                    
-                                    view.addLabel(f"{atom_name}{atom_index}", 
-                                                  {"position": {"x": x, "y": y, "z": z}, 
-                                                   "fontColor": "black", 
-                                                   "backgroundColor": "white", 
-                                                   "backgroundOpacity": 0.8, 
-                                                   "fontsize": 12})
-                                except:
-                                    pass
+                        # Manually stamp the Atom Name + Index on every atom based on XYZ line numbers
+                        lines = [line.strip() for line in xyz_data.strip().split('\n') if line.strip()]
+                        if len(lines) > 2:
+                            try:
+                                num_atoms = int(lines[0])
+                                for idx in range(num_atoms):
+                                    parts = lines[idx + 2].split()
+                                    if len(parts) >= 4:
+                                        elem = parts[0]
+                                        x, y, z = float(parts[1]), float(parts[2]), float(parts[3])
+                                        
+                                        view.addLabel(f"{elem}{idx + 1}", 
+                                                      {"position": {"x": x, "y": y, "z": z}, 
+                                                       "fontColor": "black", 
+                                                       "backgroundColor": "white", 
+                                                       "backgroundOpacity": 0.8, 
+                                                       "fontsize": 13})
+                            except Exception as e:
+                                pass
                                     
                         view.zoomTo()
                         showmol(view, height=350, width=400)
