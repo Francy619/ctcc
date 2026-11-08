@@ -86,7 +86,8 @@ elif st.session_state.app_mode == "NBO E(2) Analysis": nbo.render()
 elif st.session_state.app_mode == "QTAIM Analysis": qtaim.render()
 elif st.session_state.app_mode == "Structural Analysis": structural.render()
 elif st.session_state.app_mode == "CVB Index": cvb.render()
-elif st.session_state.app_mode == "NCI Analysis": nci.render()import streamlit as st
+elif st.session_state.app_mode == "NCI Analysis": nci.render()
+import streamlit as st
 import os
 import zipfile
 import shutil
