@@ -4,8 +4,8 @@ import zipfile
 import shutil
 import streamlit.components.v1 as components
 
-# Import all custom modules including the new NCI module
-from modules import interaction, led, nbo, qtaim, structural, cvb, nci
+# Import only the 6 active modules
+from modules import interaction, led, nbo, qtaim, structural, cvb
 
 # --- AUTO-EXTRACT MULTIWFN ---
 if not os.path.exists("Multiwfn") and os.path.exists("Multiwfn.zip"):
@@ -59,8 +59,8 @@ if st.session_state.app_mode == "Home":
     st.markdown('<p class="menu-title">CompChem Data Extraction Suite</p>', unsafe_allow_html=True)
     st.write("")
     
-    # 4 columns for the Home screen buttons
-    c_btn_1, c_btn_2, c_btn_3, c_btn_4 = st.columns([1, 1, 1, 1])
+    # Restored to 3 centered columns for 6 modules
+    c_space_l, c_btn_1, c_btn_2, c_btn_3, c_space_r = st.columns([1, 4, 4, 4, 1])
     
     with c_btn_1:
         if st.button("🔬 Interaction Energy", use_container_width=True, type="secondary"): st.session_state.app_mode = "Interaction Energy"; st.rerun()
@@ -74,8 +74,6 @@ if st.session_state.app_mode == "Home":
         if st.button("⭕ QTAIM Properties", use_container_width=True, type="secondary"): st.session_state.app_mode = "QTAIM Analysis"; st.rerun()
         st.write("")
         if st.button("📈 CVB Index", use_container_width=True, type="secondary"): st.session_state.app_mode = "CVB Index"; st.rerun()
-    with c_btn_4:
-        if st.button("🌌 NCI & RDG Plots", use_container_width=True, type="secondary"): st.session_state.app_mode = "NCI Analysis"; st.rerun()
             
     st.markdown("""<div class="footer-text"><strong>Developed by:</strong> Francis Thomas & Dr. Renjith Thomas <br> Automated tools for parsing outputs.</div>""", unsafe_allow_html=True)
 
@@ -86,4 +84,3 @@ elif st.session_state.app_mode == "NBO E(2) Analysis": nbo.render()
 elif st.session_state.app_mode == "QTAIM Analysis": qtaim.render()
 elif st.session_state.app_mode == "Structural Analysis": structural.render()
 elif st.session_state.app_mode == "CVB Index": cvb.render()
-elif st.session_state.app_mode == "NCI Analysis": nci.render()
