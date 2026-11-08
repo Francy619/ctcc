@@ -49,7 +49,6 @@ def render():
 
     st.divider()
     
-    # Store the individual files in a dictionary instead of a zip!
     if 'nci_files' not in st.session_state:
         st.session_state.nci_files = None
         st.session_state.nci_scatter_img = None
@@ -75,8 +74,16 @@ def render():
                         do_scatter = plot_choice in ["Scatter Plot", "Both"]
                         do_nci = plot_choice in ["NCI 3D Surface", "Both"]
                         
+                        # Command sequence fix: 
+                        # 20 -> NCI
+                        # 1 (or 3) -> Plot type
+                        # {quality} -> Grid quality
+                        # 1 -> Save graph to file (This was missing for the 3D plot!)
+                        # 2 -> Export data to output.txt (Only for scatter)
+                        # 0 -> Return
+                        # q -> Quit
                         cmd_scatter = f"20\n1\n{quality[0]}\n1\n2\n0\nq\n"
-                        cmd_3d = f"20\n3\n{quality[0]}\nq\n\n\n"
+                        cmd_3d = f"20\n3\n{quality[0]}\n1\n0\nq\n"
                         
                         generated_files = {}
                         
@@ -102,7 +109,6 @@ def render():
                                 update_multiwfn_settings(tmp_dir, "ps")
                                 subprocess.run(["./Multiwfn", w_file.name], input=cmd_scatter, capture_output=True, text=True, cwd=tmp_dir)
                                 
-                                # Read files directly into Python memory
                                 if os.path.exists(os.path.join(tmp_dir, "scatter.ps")):
                                     with open(os.path.join(tmp_dir, "scatter.ps"), "rb") as f:
                                         generated_files[f"RDG_Scatter_{basename}.ps"] = f.read()
@@ -131,7 +137,7 @@ def render():
                                         generated_files[f"NCI_3D_Surface_{basename}.ps"] = f.read()
                             
                             if not generated_files:
-                                st.error("Multiwfn finished, but no files were generated.")
+                                st.error("Multiwfn finished, but no files were generated. (Check your file or grid quality).")
                             else:
                                 st.session_state.nci_files = generated_files
                                 st.success(f"Plots rendered successfully!")
@@ -162,14 +168,22 @@ def render():
             # --- DYNAMIC ROW OF INDIVIDUAL DOWNLOAD BUTTONS ---
             st.markdown('<p class="section-header">Download Output Files</p>', unsafe_allow_html=True)
             
-            # Create exactly as many columns as there are files + 1 for the Reset button
             cols = st.columns(len(st.session_state.nci_files) + 1)
             
             for i, (filename, file_data) in enumerate(st.session_state.nci_files.items()):
                 with cols[i]:
                     ext = filename.split('.')[-1].upper()
+                    
+                    # Create clear labels for the buttons
+                    if "Scatter_Data" in filename:
+                        label = "⬇️ Download Scatter Data (.dat)"
+                    elif "Scatter" in filename:
+                        label = "⬇️ Download Scatter Plot (.ps)"
+                    else:
+                        label = "⬇️ Download NCI Surface (.ps)"
+                        
                     st.download_button(
-                        label=f"⬇️ Download {ext} ({'Scatter' if 'Scatter' in filename else 'Surface'})",
+                        label=label,
                         data=file_data,
                         file_name=filename,
                         use_container_width=True,
