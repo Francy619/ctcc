@@ -28,6 +28,9 @@ if 'app_mode' not in st.session_state:
 # GLOBAL CSS
 st.markdown("""
 <style>
+    /* OVERRIDE STREAMLIT DEFAULT TOP PADDING */
+    .block-container { padding-top: 2rem !important; }
+    
     footer, [data-testid="stFooter"], .stStatusWidget { display: none !important; visibility: hidden !important; height: 0px !important; max-height: 0px !important; }
     button[title="View fullscreen"] { display: none !important; }
     header { visibility: hidden !important; display: none !important; }
@@ -51,8 +54,8 @@ if st.session_state.app_mode == "Home":
     <style>
         .title-container {
             text-align: center;
-            margin-top: 30px;
-            margin-bottom: 50px;
+            margin-top: 0px;  /* Removed top margin */
+            margin-bottom: 40px; /* Reduced gap before buttons */
         }
         .compchem-highlight {
             font-size: 5.5rem;
