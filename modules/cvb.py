@@ -6,52 +6,38 @@ import subprocess
 import pandas as pd
 import xlsxwriter
 import shutil
-import glob
+import py3Dmol
+from stmol import showmol
 
-def generate_structure_preview(w_file_bytes, filename):
-    """Uses Multiwfn silently to generate the structure PNG with atom labels"""
-    tmp_dir = f"temp_cvb_preview_{filename.replace('.', '_')}"
+def get_pdb_from_multiwfn(w_file_bytes, filename):
+    """Uses Multiwfn silently to export a .pdb coordinate file (no graphics required)"""
+    tmp_dir = f"temp_cvb_pdb_{filename.replace('.', '_')}"
     os.makedirs(tmp_dir, exist_ok=True)
-    img_data = None
+    pdb_data = None
     
     try:
-        # 1. Copy Multiwfn into the temp folder
         if os.path.exists("Multiwfn"):
             shutil.copy("Multiwfn", os.path.join(tmp_dir, "Multiwfn"))
-        
-        # 2. Force silent mode and PNG export in settings.ini
-        if os.path.exists("settings.ini"):
-            with open("settings.ini", "r", encoding="utf-8") as f:
-                content = f.read()
-            content = re.sub(r'isilent\s*=\s*0', 'isilent= 1', content, flags=re.IGNORECASE)
-            content = re.sub(r'graphformat\s*=\s*\w+', 'graphformat=png', content, flags=re.IGNORECASE)
-            with open(os.path.join(tmp_dir, "settings.ini"), "w", encoding="utf-8") as f:
-                f.write(content)
-                
-        # 3. Save the uploaded file
+            
         file_path = os.path.join(tmp_dir, filename)
         with open(file_path, "wb") as f:
             f.write(w_file_bytes)
             
-        # 4. Run Multiwfn Function 0
-        # Command Sequence: 
-        # 0 (View structure) -> 1 (Save graph to file) -> 0 (Return) -> q (Quit)
-        cmd = "0\n1\n0\nq\n"
+        # Command: 100 (Other functions) -> 2 (Export geometry) -> 1 (Export to PDB) -> filename -> 0 -> q
+        cmd = "100\n2\n1\npreview.pdb\n0\nq\n"
         subprocess.run(["./Multiwfn", filename], input=cmd, capture_output=True, text=True, cwd=tmp_dir)
         
-        # 5. Extract the generated PNG file
-        png_files = glob.glob(os.path.join(tmp_dir, "*.png"))
-        if png_files:
-            with open(png_files[0], "rb") as f:
-                img_data = f.read()
+        pdb_path = os.path.join(tmp_dir, "preview.pdb")
+        if os.path.exists(pdb_path):
+            with open(pdb_path, "r") as f:
+                pdb_data = f.read()
                 
     except Exception as e:
         pass
     finally:
-        # Clean up the temp directory
         shutil.rmtree(tmp_dir, ignore_errors=True)
         
-    return img_data
+    return pdb_data
 
 def render():
     st.markdown('<div class="home-btn-container">', unsafe_allow_html=True)
@@ -63,7 +49,6 @@ def render():
     
     st.markdown('<div class="main-header-container"><div class="main-title">📈 Core Valence Bifurcation (CVB) Index</div><div class="sub-title">Automate Multiwfn to calculate CVB metrics directly from .wfn/.wfx files.</div></div>', unsafe_allow_html=True)
     
-    # Check if the binary was found
     if not os.path.exists("Multiwfn"):
         st.error("🚨 **Multiwfn Binary Missing:** The 'Multiwfn' executable was not found on the server. Please ensure Multiwfn.zip is uploaded to the root of your GitHub repository.")
         st.stop()
@@ -80,20 +65,45 @@ def render():
                 
             with col_cvb_view:
                 if w_file:
-                    st.markdown("**👁️ Molecule Structure (Multiwfn)**")
+                    st.markdown("**👁️ Interactive Molecule Viewer (Atom Indices)**")
                     
-                    # Create a unique key so the image only generates once per file
-                    preview_key = f"cvb_preview_{w_file.name}_{w_file.size}"
+                    preview_key = f"cvb_pdb_{w_file.name}_{w_file.size}"
                     
                     if preview_key not in st.session_state:
-                        with st.spinner("Generating Multiwfn Structure Preview..."):
-                            st.session_state[preview_key] = generate_structure_preview(w_file.getvalue(), w_file.name)
+                        with st.spinner("Extracting 3D Coordinates..."):
+                            st.session_state[preview_key] = get_pdb_from_multiwfn(w_file.getvalue(), w_file.name)
                             
-                    # Display the image if Multiwfn successfully created it
-                    if st.session_state[preview_key]:
-                        st.image(st.session_state[preview_key], use_container_width=True)
+                    pdb_data = st.session_state[preview_key]
+                    
+                    if pdb_data:
+                        # Render the 3D molecule interactively
+                        view = py3Dmol.view(width=400, height=350)
+                        view.addModel(pdb_data, "pdb")
+                        view.setStyle({'stick': {'radius': 0.15}, 'sphere': {'scale': 0.25}})
+                        
+                        # Manually stamp the Atom Name + Index on every atom exactly where it belongs
+                        for line in pdb_data.split('\n'):
+                            if line.startswith("ATOM") or line.startswith("HETATM"):
+                                try:
+                                    atom_index = int(line[6:11].strip())
+                                    atom_name = line[12:16].strip()
+                                    x = float(line[30:38].strip())
+                                    y = float(line[38:46].strip())
+                                    z = float(line[46:54].strip())
+                                    
+                                    view.addLabel(f"{atom_name}{atom_index}", 
+                                                  {"position": {"x": x, "y": y, "z": z}, 
+                                                   "fontColor": "black", 
+                                                   "backgroundColor": "white", 
+                                                   "backgroundOpacity": 0.8, 
+                                                   "fontsize": 12})
+                                except:
+                                    pass
+                                    
+                        view.zoomTo()
+                        showmol(view, height=350, width=400)
                     else:
-                        st.warning("⚠️ Could not generate Multiwfn preview image.")
+                        st.warning("⚠️ Could not extract 3D coordinates for preview. (You can still run the calculation).")
             
             cvb_inputs.append({"file": w_file, "atoms": w_atoms})
             
@@ -121,8 +131,6 @@ def render():
 
     if do_cvb_run:
         all_extracted_data = []
-        
-        # Make a temporary directory to keep things clean
         tmp_dir = "temp_multiwfn_cvb_calc"
         os.makedirs(tmp_dir, exist_ok=True)
         
@@ -133,7 +141,6 @@ def render():
                 
                 if not w_file or not atoms: continue
                 
-                # 1. Save uploaded file to the temporary disk
                 file_path = os.path.join(tmp_dir, w_file.name)
                 with open(file_path, "wb") as f:
                     f.write(w_file.getbuffer())
@@ -141,7 +148,6 @@ def render():
                 basename = os.path.splitext(w_file.name)[0]
                 system_name = basename.replace('_', ' - ')
                 
-                # 2. Pipe the exact keystrokes into Multiwfn (Function 200 -> 1 -> atoms -> 0 -> q)
                 command_sequence = f"200\n1\n{atoms}\n0\nq\n"
                 
                 try:
@@ -155,7 +161,6 @@ def render():
                     
                     output_text = process.stdout
                     
-                    # 3. Parse the output text directly from the terminal stream
                     match_cv_d = re.search(r'donor.*?([-+]?\d*\.\d+)', output_text, re.IGNORECASE) or re.search(r'ELF\(C-V,\s*D\).*?([-+]?\d*\.\d+)', output_text, re.IGNORECASE)
                     match_cv_a = re.search(r'acceptor.*?([-+]?\d*\.\d+)', output_text, re.IGNORECASE) or re.search(r'ELF\(C-V,\s*A\).*?([-+]?\d*\.\d+)', output_text, re.IGNORECASE)
                     match_dh_a = re.search(r'between D-H and A.*?([-+]?\d*\.\d+)', output_text, re.IGNORECASE) or re.search(r'ELF\(DH-A\).*?([-+]?\d*\.\d+)', output_text, re.IGNORECASE) or re.search(r'DH-A.*?([-+]?\d*\.\d+)', output_text, re.IGNORECASE) or re.search(r'minimum.*?([-+]?\d*\.\d+)', output_text, re.IGNORECASE)
@@ -172,11 +177,9 @@ def render():
                 except subprocess.CalledProcessError as e:
                     st.error(f"Multiwfn crashed processing {w_file.name}: {e.stderr}")
                 finally:
-                    # Clean up the file off the server immediately
                     if os.path.exists(file_path):
                         os.remove(file_path)
             
-            # Clean up temporary directory
             if os.path.exists(tmp_dir):
                 os.rmdir(tmp_dir)
 
@@ -184,7 +187,6 @@ def render():
             st.error("No valid CVB data was extracted. Ensure your Target Atoms are correct.")
             st.stop()
             
-        # 4. Generate the Excel File
         output = io.BytesIO()
         workbook = xlsxwriter.Workbook(output, {'in_memory': True})
         worksheet = workbook.add_worksheet("CVB Data")
