@@ -5,9 +5,53 @@ import io
 import subprocess
 import pandas as pd
 import xlsxwriter
+import shutil
+import glob
 
-# Import from utils
-from utils import HAS_3D, show_3d_molecule
+def generate_structure_preview(w_file_bytes, filename):
+    """Uses Multiwfn silently to generate the structure PNG with atom labels"""
+    tmp_dir = f"temp_cvb_preview_{filename.replace('.', '_')}"
+    os.makedirs(tmp_dir, exist_ok=True)
+    img_data = None
+    
+    try:
+        # 1. Copy Multiwfn into the temp folder
+        if os.path.exists("Multiwfn"):
+            shutil.copy("Multiwfn", os.path.join(tmp_dir, "Multiwfn"))
+        
+        # 2. Force silent mode and PNG export in settings.ini
+        if os.path.exists("settings.ini"):
+            with open("settings.ini", "r", encoding="utf-8") as f:
+                content = f.read()
+            content = re.sub(r'isilent\s*=\s*0', 'isilent= 1', content, flags=re.IGNORECASE)
+            content = re.sub(r'graphformat\s*=\s*\w+', 'graphformat=png', content, flags=re.IGNORECASE)
+            with open(os.path.join(tmp_dir, "settings.ini"), "w", encoding="utf-8") as f:
+                f.write(content)
+                
+        # 3. Save the uploaded file
+        file_path = os.path.join(tmp_dir, filename)
+        with open(file_path, "wb") as f:
+            f.write(w_file_bytes)
+            
+        # 4. Run Multiwfn Function 0
+        # Command Sequence: 
+        # 0 (View structure) -> 1 (Save graph to file) -> 0 (Return) -> q (Quit)
+        cmd = "0\n1\n0\nq\n"
+        subprocess.run(["./Multiwfn", filename], input=cmd, capture_output=True, text=True, cwd=tmp_dir)
+        
+        # 5. Extract the generated PNG file
+        png_files = glob.glob(os.path.join(tmp_dir, "*.png"))
+        if png_files:
+            with open(png_files[0], "rb") as f:
+                img_data = f.read()
+                
+    except Exception as e:
+        pass
+    finally:
+        # Clean up the temp directory
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+        
+    return img_data
 
 def render():
     st.markdown('<div class="home-btn-container">', unsafe_allow_html=True)
@@ -19,7 +63,7 @@ def render():
     
     st.markdown('<div class="main-header-container"><div class="main-title">📈 Core Valence Bifurcation (CVB) Index</div><div class="sub-title">Automate Multiwfn to calculate CVB metrics directly from .wfn/.wfx files.</div></div>', unsafe_allow_html=True)
     
-    # Check if the binary was found and unzipped successfully
+    # Check if the binary was found
     if not os.path.exists("Multiwfn"):
         st.error("🚨 **Multiwfn Binary Missing:** The 'Multiwfn' executable was not found on the server. Please ensure Multiwfn.zip is uploaded to the root of your GitHub repository.")
         st.stop()
@@ -36,11 +80,20 @@ def render():
                 
             with col_cvb_view:
                 if w_file:
-                    if HAS_3D:
-                        st.markdown("**👁️ Molecule Structure & Atoms**")
-                        show_3d_molecule(w_file.getvalue().decode('utf-8'), w_file.name)
+                    st.markdown("**👁️ Molecule Structure (Multiwfn)**")
+                    
+                    # Create a unique key so the image only generates once per file
+                    preview_key = f"cvb_preview_{w_file.name}_{w_file.size}"
+                    
+                    if preview_key not in st.session_state:
+                        with st.spinner("Generating Multiwfn Structure Preview..."):
+                            st.session_state[preview_key] = generate_structure_preview(w_file.getvalue(), w_file.name)
+                            
+                    # Display the image if Multiwfn successfully created it
+                    if st.session_state[preview_key]:
+                        st.image(st.session_state[preview_key], use_container_width=True)
                     else:
-                        st.error("🚨 Missing Required Packages! To see the 3D molecule viewer, you must add `stmol` and `py3Dmol` to your `requirements.txt` file.")
+                        st.warning("⚠️ Could not generate Multiwfn preview image.")
             
             cvb_inputs.append({"file": w_file, "atoms": w_atoms})
             
@@ -70,7 +123,7 @@ def render():
         all_extracted_data = []
         
         # Make a temporary directory to keep things clean
-        tmp_dir = "temp_multiwfn"
+        tmp_dir = "temp_multiwfn_cvb_calc"
         os.makedirs(tmp_dir, exist_ok=True)
         
         with st.spinner("Running Multiwfn silently in the background... This may take a moment."):
@@ -88,7 +141,7 @@ def render():
                 basename = os.path.splitext(w_file.name)[0]
                 system_name = basename.replace('_', ' - ')
                 
-                # 2. Pipe the exact keystrokes into Multiwfn
+                # 2. Pipe the exact keystrokes into Multiwfn (Function 200 -> 1 -> atoms -> 0 -> q)
                 command_sequence = f"200\n1\n{atoms}\n0\nq\n"
                 
                 try:
@@ -128,7 +181,7 @@ def render():
                 os.rmdir(tmp_dir)
 
         if not all_extracted_data:
-            st.error("No valid CVB data was extracted.")
+            st.error("No valid CVB data was extracted. Ensure your Target Atoms are correct.")
             st.stop()
             
         # 4. Generate the Excel File
