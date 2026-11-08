@@ -49,14 +49,44 @@ st.markdown("""
 if st.session_state.app_mode == "Home":
     st.markdown("""
     <style>
-        .menu-title { font-size: 4.8rem; font-weight: 600; color: #1E3A8A; text-align: center; margin-top: 20px; margin-bottom: 40px; font-family: 'Inter', 'Roboto', 'Helvetica Neue', sans-serif; line-height: 1.1; }
+        .title-container {
+            text-align: center;
+            margin-top: 30px;
+            margin-bottom: 50px;
+        }
+        .compchem-highlight {
+            font-size: 5.5rem;
+            font-weight: 900;
+            font-family: 'Inter', 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            line-height: 1.1;
+            text-shadow: 2px 4px 10px rgba(30, 58, 138, 0.15);
+            display: block;
+        }
+        .suite-text {
+            font-size: 2.2rem;
+            font-weight: 600;
+            color: #4B5563;
+            font-family: 'Inter', 'Segoe UI', sans-serif;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            display: block;
+            margin-top: 5px;
+        }
         .footer-text { text-align: center; color: #64748B; font-size: 1rem; margin-top: 80px; border-top: 1px solid #E2E8F0; padding-top: 30px;}
         [data-testid="stAppViewContainer"] { overflow-y: hidden !important; }
         button[kind="secondary"] { background-color: #1E3A8A !important; color: #FFFFFF !important; font-size: 2.1rem !important; min-height: 100px !important; padding: 25px 15px !important; }
     </style>
     """, unsafe_allow_html=True)
         
-    st.markdown('<p class="menu-title">CompChem Data Extraction Suite</p>', unsafe_allow_html=True)
+    st.markdown("""
+        <div class="title-container">
+            <span class="compchem-highlight">CompChem</span>
+            <span class="suite-text">Data Extraction Suite</span>
+        </div>
+    """, unsafe_allow_html=True)
     st.write("")
     
     # Restored to 3 centered columns for 6 modules
