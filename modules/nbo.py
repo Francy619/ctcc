@@ -24,12 +24,14 @@ def render():
         nbo_files = st.file_uploader("Upload NBO log files (.log, .out)", accept_multiple_files=True)
     st.divider()
     
+    # Initialize session states
     if 'calc_done_nbo' not in st.session_state:
         st.session_state.calc_done_nbo = False
         st.session_state.excel_data_nbo = None
         st.session_state.all_top_n = []
         st.session_state.file_data_dict = {}
         st.session_state.warnings_nbo = []
+        st.session_state.file_errors_nbo = [] # New list to hold critical file errors
 
     btn_placeholder = st.empty()
     do_nbo_run = False
@@ -51,13 +53,31 @@ def render():
             st.error("Please upload NBO files.")
         else:
             st.session_state.warnings_nbo = [] 
+            st.session_state.file_errors_nbo = [] # Reset errors on new run
             
             file_data_dict = {}
             all_top_n_data = []
             
             for uploaded_file in nbo_files:
                 uploaded_file.seek(0)
-                lines = uploaded_file.read().decode('utf-8').splitlines()
+                
+                # --- NEW TRY/EXCEPT BLOCK FOR ERROR CATCHING ---
+                try:
+                    lines = uploaded_file.read().decode('utf-8').splitlines()
+                except UnicodeDecodeError as e:
+                    # Catch the exact file and error, store it to show the user
+                    error_msg = f"Encoding Error in **{uploaded_file.name}**: {e}. (Falling back to 'ignore' mode to salvage readable data)"
+                    st.session_state.file_errors_nbo.append(error_msg)
+                    
+                    # Fall back to ignoring bad characters so it doesn't crash
+                    uploaded_file.seek(0)
+                    lines = uploaded_file.read().decode('utf-8', errors='ignore').splitlines()
+                except Exception as e:
+                    # Catch any other weird file reading errors completely
+                    st.session_state.file_errors_nbo.append(f"Unexpected error reading **{uploaded_file.name}**: {e}")
+                    continue # Skip this file completely if it's utterly broken
+                # -----------------------------------------------
+
                 basename = os.path.splitext(uploaded_file.name)[0]
                 file_extracted_data = []
                 in_target_section = False
@@ -159,6 +179,12 @@ def render():
             
     if st.session_state.calc_done_nbo:
         st.write("") 
+        
+        # Display the critical file errors clearly in red
+        for err in st.session_state.file_errors_nbo:
+            st.error(err)
+            
+        # Display the standard warnings in yellow
         for w in st.session_state.warnings_nbo:
             st.warning(w)
             
