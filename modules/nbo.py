@@ -98,17 +98,19 @@ def render():
                 
             output = io.BytesIO()
             workbook = xlsxwriter.Workbook(output, {'in_memory': True})
+            
+            # --- Format Declarations ---
             header_format = workbook.add_format({'bold': True, 'align': 'center', 'valign': 'vcenter', 'border': 1, 'font_name': 'Times New Roman', 'font_size': 12})
             center_format = workbook.add_format({'align': 'center', 'valign': 'vcenter', 'border': 1, 'font_name': 'Times New Roman', 'font_size': 12})
             left_format = workbook.add_format({'align': 'left', 'valign': 'vcenter', 'border': 1, 'font_name': 'Times New Roman', 'font_size': 12})
-            
-            headers = ["System", "Interaction Section", "Donor NBO (i)", "Acceptor NBO (j)", "E(2) kcal/mol", "E(j)-E(i) a.u.", "F(i,j) a.u."]
+            section_format = workbook.add_format({'bold': True, 'align': 'left', 'valign': 'vcenter', 'border': 1, 'font_name': 'Times New Roman', 'font_size': 12})
             
             # --- 1. Write the Top N Summary Sheet ---
             if all_top_n_data:
                 ws_top = workbook.add_worksheet(f'Top {top_n} Interactions')
+                top_n_columns = ["System", "Interaction Section", "Donor NBO (i)", "Acceptor NBO (j)", "E(2) kcal/mol", "E(j)-E(i) a.u.", "F(i,j) a.u."]
                 ws_top.set_row(0, 20)
-                for col_num, header in enumerate(headers): ws_top.write(0, col_num, header, header_format)
+                for col_num, header in enumerate(top_n_columns): ws_top.write(0, col_num, header, header_format)
                 ws_top.set_column('A:A', 20); ws_top.set_column('B:B', 30); ws_top.set_column('C:D', 35); ws_top.set_column('E:G', 15)
                 
                 for row_num, row_data in enumerate(all_top_n_data, start=1):
@@ -117,19 +119,36 @@ def render():
                     for col_num in range(4, 7): ws_top.write_number(row_num, col_num, row_data[col_num], center_format)
             
             # --- 2. Write Individual Sheets for EVERY File ---
+            indiv_columns = ["Donor NBO (i)", "Acceptor NBO (j)", "E(2) kcal/mol", "E(j)-E(i) a.u.", "F(i,j) a.u."]
+            
             for filename, all_file_data in file_data_dict.items():
-                # Excel limits sheet names to 31 characters, so we truncate the filename just in case
                 safe_sheet_name = str(filename)[:31]
                 ws_file = workbook.add_worksheet(safe_sheet_name)
                 ws_file.set_row(0, 20)
                 
-                for col_num, header in enumerate(headers): ws_file.write(0, col_num, header, header_format)
-                ws_file.set_column('A:A', 20); ws_file.set_column('B:B', 30); ws_file.set_column('C:D', 35); ws_file.set_column('E:G', 15)
+                for col_num, header in enumerate(indiv_columns): 
+                    ws_file.write(0, col_num, header, header_format)
+                ws_file.set_column('A:B', 35); ws_file.set_column('C:E', 15)
                 
-                for row_num, row_data in enumerate(all_file_data, start=1):
-                    ws_file.set_row(row_num, 20)
-                    for col_num in range(4): ws_file.write(row_num, col_num, row_data[col_num], left_format)
-                    for col_num in range(4, 7): ws_file.write_number(row_num, col_num, row_data[col_num], center_format)
+                current_excel_row = 1
+                last_section = None
+                
+                for row_data in all_file_data:
+                    current_section = row_data[1]
+                    
+                    if current_section != last_section:
+                        ws_file.set_row(current_excel_row, 20)
+                        ws_file.write(current_excel_row, 0, current_section, section_format)
+                        current_excel_row += 1
+                        last_section = current_section
+                    
+                    ws_file.set_row(current_excel_row, 20)
+                    ws_file.write(current_excel_row, 0, row_data[2], left_format) 
+                    ws_file.write(current_excel_row, 1, row_data[3], left_format) 
+                    ws_file.write_number(current_excel_row, 2, row_data[4], center_format)
+                    ws_file.write_number(current_excel_row, 3, row_data[5], center_format)
+                    ws_file.write_number(current_excel_row, 4, row_data[6], center_format)
+                    current_excel_row += 1
                     
             workbook.close()
             
