@@ -23,6 +23,7 @@ def render():
         with col2: allowed_sections = st.multiselect("Interaction types to consider (for highest values):", ["within unit 1", "from unit 1 to unit 2", "from unit 2 to unit 1", "within unit 2"], default=["from unit 1 to unit 2", "from unit 2 to unit 1"])
         nbo_files = st.file_uploader("Upload NBO log files (.log, .out)", accept_multiple_files=True)
     st.divider()
+    
     if 'calc_done_nbo' not in st.session_state:
         st.session_state.calc_done_nbo = False
         st.session_state.excel_data_nbo = None
@@ -32,6 +33,7 @@ def render():
 
     btn_placeholder = st.empty()
     do_nbo_run = False
+    
     with btn_placeholder.container():
         if not st.session_state.calc_done_nbo:
             col_s1, col_btn, col_s2 = st.columns([1, 1, 1])
@@ -52,6 +54,7 @@ def render():
             
             file_data_dict = {}
             all_top_n_data = []
+            
             for uploaded_file in nbo_files:
                 uploaded_file.seek(0)
                 lines = uploaded_file.read().decode('utf-8').splitlines()
@@ -98,17 +101,38 @@ def render():
             header_format = workbook.add_format({'bold': True, 'align': 'center', 'valign': 'vcenter', 'border': 1, 'font_name': 'Times New Roman', 'font_size': 12})
             center_format = workbook.add_format({'align': 'center', 'valign': 'vcenter', 'border': 1, 'font_name': 'Times New Roman', 'font_size': 12})
             left_format = workbook.add_format({'align': 'left', 'valign': 'vcenter', 'border': 1, 'font_name': 'Times New Roman', 'font_size': 12})
+            
+            headers = ["System", "Interaction Section", "Donor NBO (i)", "Acceptor NBO (j)", "E(2) kcal/mol", "E(j)-E(i) a.u.", "F(i,j) a.u."]
+            
+            # --- 1. Write the Top N Summary Sheet ---
             if all_top_n_data:
                 ws_top = workbook.add_worksheet(f'Top {top_n} Interactions')
-                top_n_columns = ["System", "Interaction Section", "Donor NBO (i)", "Acceptor NBO (j)", "E(2) kcal/mol", "E(j)-E(i) a.u.", "F(i,j) a.u."]
                 ws_top.set_row(0, 20)
-                for col_num, header in enumerate(top_n_columns): ws_top.write(0, col_num, header, header_format)
+                for col_num, header in enumerate(headers): ws_top.write(0, col_num, header, header_format)
                 ws_top.set_column('A:A', 20); ws_top.set_column('B:B', 30); ws_top.set_column('C:D', 35); ws_top.set_column('E:G', 15)
+                
                 for row_num, row_data in enumerate(all_top_n_data, start=1):
                     ws_top.set_row(row_num, 20)
                     for col_num in range(4): ws_top.write(row_num, col_num, row_data[col_num], left_format)
                     for col_num in range(4, 7): ws_top.write_number(row_num, col_num, row_data[col_num], center_format)
+            
+            # --- 2. Write Individual Sheets for EVERY File ---
+            for filename, all_file_data in file_data_dict.items():
+                # Excel limits sheet names to 31 characters, so we truncate the filename just in case
+                safe_sheet_name = str(filename)[:31]
+                ws_file = workbook.add_worksheet(safe_sheet_name)
+                ws_file.set_row(0, 20)
+                
+                for col_num, header in enumerate(headers): ws_file.write(0, col_num, header, header_format)
+                ws_file.set_column('A:A', 20); ws_file.set_column('B:B', 30); ws_file.set_column('C:D', 35); ws_file.set_column('E:G', 15)
+                
+                for row_num, row_data in enumerate(all_file_data, start=1):
+                    ws_file.set_row(row_num, 20)
+                    for col_num in range(4): ws_file.write(row_num, col_num, row_data[col_num], left_format)
+                    for col_num in range(4, 7): ws_file.write_number(row_num, col_num, row_data[col_num], center_format)
+                    
             workbook.close()
+            
             st.session_state.all_top_n = all_top_n_data
             st.session_state.excel_data_nbo = output.getvalue()
             st.session_state.calc_done_nbo = True
@@ -120,4 +144,5 @@ def render():
             st.warning(w)
             
         if st.session_state.all_top_n:
+            st.markdown('**Summary: Top Interactions Across All Files** *(Download Excel for full data per file)*')
             st.dataframe(pd.DataFrame(st.session_state.all_top_n, columns=["System", "Interaction Section", "Donor (i)", "Acceptor (j)", "E(2) kcal/mol", "E(j)-E(i) a.u.", "F(i,j) a.u."]), use_container_width=True)
