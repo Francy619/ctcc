@@ -143,5 +143,31 @@ def render():
         st.rerun()
 
     if st.session_state.calc_done_qtaim:
+        st.write("")
         for w in st.session_state.warnings_qtaim:
             st.warning(w)
+            
+        if st.session_state.qtaim_results:
+            st.markdown('**Summary: Extracted QTAIM Properties** *(Download Excel for formatted report)*')
+            
+            # Convert dictionary list to pandas DataFrame
+            df = pd.DataFrame(st.session_state.qtaim_results)
+            
+            # Map the backend keys to nice UI column headers
+            rename_map = {
+                "System": "System",
+                "CP Number": "CP",
+                "Density of all electrons": "ρ(r)",
+                "Laplacian of electron density": "∇²ρ",
+                "Potential energy density V(r)": "V(r_bcp)",
+                "Lagrangian kinetic energy G(r)": "G(rcp)",
+                "Energy density E(r) or H(r)": "H(r)",
+                "Binding Energy": "B.E. (kcal/mol)"
+            }
+            df = df.rename(columns=rename_map)
+            
+            # Ensure the columns display in the exact same order as the Excel sheet
+            cols_order = ["System", "CP", "ρ(r)", "∇²ρ", "V(r_bcp)", "G(rcp)", "H(r)", "B.E. (kcal/mol)"]
+            df = df[[c for c in cols_order if c in df.columns]]
+            
+            st.dataframe(df, use_container_width=True, hide_index=True)
